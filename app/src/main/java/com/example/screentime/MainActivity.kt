@@ -180,12 +180,19 @@ class MainActivity : Activity() {
         addTo(limitCard, saveButton, 12)
         addTo(root, limitCard, 16)
 
+        // App usage today
+        val appUsageButton = styledButton("App usage today", card, textMain)
+        appUsageButton.setOnClickListener {
+            startActivity(Intent(this, AppUsageActivity::class.java))
+        }
+        addTo(root, appUsageButton, 16)
+
         // Allowed apps
         val chooseButton = styledButton("Choose allowed apps", card, textMain)
         chooseButton.setOnClickListener {
             startActivity(Intent(this, AllowedAppsActivity::class.java))
         }
-        addTo(root, chooseButton, 16)
+        addTo(root, chooseButton, 10)
 
         // Start / stop blocker
         controlsRow = LinearLayout(this)
