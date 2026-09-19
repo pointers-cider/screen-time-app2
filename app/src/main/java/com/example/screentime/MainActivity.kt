@@ -9,8 +9,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
+import android.text.InputType
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.util.Calendar
@@ -19,6 +21,8 @@ class MainActivity : Activity() {
 
     private lateinit var infoText: TextView
     private lateinit var permissionButton: Button
+    private lateinit var limitInput: EditText
+    private lateinit var saveButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,17 +40,52 @@ class MainActivity : Activity() {
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         }
 
+        limitInput = EditText(this)
+        limitInput.hint = "Daily limit in minutes (e.g. 120)"
+        limitInput.inputType = InputType.TYPE_CLASS_NUMBER
+        val saved = getPrefs().getInt("limit_minutes", 0)
+        if (saved > 0) limitInput.setText(saved.toString())
+
+        saveButton = Button(this)
+        saveButton.text = "Save limit"
+        saveButton.setOnClickListener {
+            val value = limitInput.text.toString().toIntOrNull() ?: 0
+            getPrefs().edit().putInt("limit_minutes", value).apply()
+            refresh()
+        }
+
         layout.addView(infoText)
         layout.addView(permissionButton)
+        layout.addView(limitInput)
+        layout.addView(saveButton)
         setContentView(layout)
     }
 
     override fun onResume() {
         super.onResume()
+        refresh()
+    }
+
+    private fun getPrefs() = getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    private fun refresh() {
         if (hasUsagePermission()) {
             permissionButton.visibility = View.GONE
-            val minutes = getTodayScreenTimeMs() / 60000
-            infoText.text = "Screen time today: ${minutes / 60}h ${minutes % 60}m"
+            val used = (getTodayScreenTimeMs() / 60000).toInt()
+            val limit = getPrefs().getInt("limit_minutes", 0)
+            var text = "Used today: ${used / 60}h ${used % 60}m"
+            if (limit > 0) {
+                val left = limit - used
+                text += "\nLimit: $limit min"
+                if (left > 0) {
+                    text += "\nTime left: ${left / 60}h ${left % 60}m"
+                } else {
+                    text += "\nLimit reached!"
+                }
+            } else {
+                text += "\nNo limit set yet."
+            }
+            infoText.text = text
         } else {
             permissionButton.visibility = View.VISIBLE
             infoText.text = "Please allow usage access so the app can measure your screen time."
@@ -94,3 +133,5 @@ class MainActivity : Activity() {
         return total
     }
 }
+
+    
