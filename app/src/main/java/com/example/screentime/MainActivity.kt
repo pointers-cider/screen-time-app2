@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private lateinit var overlayButton: Button
     private lateinit var limitInput: EditText
     private lateinit var saveButton: Button
+    private lateinit var chooseButton: Button
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
 
@@ -73,6 +74,12 @@ class MainActivity : Activity() {
             refresh()
         }
 
+        chooseButton = Button(this)
+        chooseButton.text = "Choose allowed apps"
+        chooseButton.setOnClickListener {
+            startActivity(Intent(this, AllowedAppsActivity::class.java))
+        }
+
         startButton = Button(this)
         startButton.text = "Start blocker"
         startButton.setOnClickListener {
@@ -92,6 +99,7 @@ class MainActivity : Activity() {
         layout.addView(overlayButton)
         layout.addView(limitInput)
         layout.addView(saveButton)
+        layout.addView(chooseButton)
         layout.addView(startButton)
         layout.addView(stopButton)
         setContentView(layout)
@@ -145,4 +153,3 @@ class MainActivity : Activity() {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 }
-    
