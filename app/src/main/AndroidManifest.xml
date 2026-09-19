@@ -22,6 +22,8 @@
     </queries>
 
     <application
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="Screen Time"
         android:allowBackup="false">
         <activity
