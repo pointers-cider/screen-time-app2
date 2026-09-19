@@ -6,7 +6,8 @@ import android.content.Context
 import java.util.Calendar
 
 object UsageHelper {
-    fun todayScreenTimeMs(context: Context): Long {
+
+    fun todayPerAppMs(context: Context): Map<String, Long> {
         val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
         val calendar = Calendar.getInstance()
@@ -20,7 +21,7 @@ object UsageHelper {
         val events = manager.queryEvents(start, now)
         val event = UsageEvents.Event()
         val openApps = HashMap<String, Long>()
-        var total = 0L
+        val totals = HashMap<String, Long>()
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
@@ -29,11 +30,19 @@ object UsageHelper {
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> openApps[pkg] = event.timeStamp
                 UsageEvents.Event.MOVE_TO_BACKGROUND -> {
                     val opened = openApps.remove(pkg)
-                    if (opened != null) total += event.timeStamp - opened
+                    if (opened != null) {
+                        totals[pkg] = (totals[pkg] ?: 0L) + (event.timeStamp - opened)
+                    }
                 }
             }
         }
-        for (opened in openApps.values) total += now - opened
-        return total
+        for ((pkg, opened) in openApps) {
+            totals[pkg] = (totals[pkg] ?: 0L) + (now - opened)
+        }
+        return totals
+    }
+
+    fun todayScreenTimeMs(context: Context): Long {
+        return todayPerAppMs(context).values.sum()
     }
 }
