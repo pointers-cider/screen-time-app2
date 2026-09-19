@@ -138,6 +138,11 @@ class BlockerService : Service() {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val info = packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
         info?.activityInfo?.packageName?.let { set.add(it) }
+
+        val chosen = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getStringSet("allowed_apps", emptySet())
+        if (chosen != null) set.addAll(chosen)
+
         return set
     }
 
