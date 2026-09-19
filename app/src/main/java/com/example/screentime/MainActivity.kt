@@ -1,11 +1,12 @@
 package com.example.screentime
 
+import android.Manifest
 import android.app.Activity
 import android.app.AppOpsManager
-import android.app.usage.UsageEvents
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
@@ -15,17 +16,24 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import java.util.Calendar
+import android.widget.Toast
 
 class MainActivity : Activity() {
 
     private lateinit var infoText: TextView
-    private lateinit var permissionButton: Button
+    private lateinit var usageButton: Button
+    private lateinit var overlayButton: Button
     private lateinit var limitInput: EditText
     private lateinit var saveButton: Button
+    private lateinit var startButton: Button
+    private lateinit var stopButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
 
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
@@ -34,10 +42,21 @@ class MainActivity : Activity() {
         infoText = TextView(this)
         infoText.textSize = 24f
 
-        permissionButton = Button(this)
-        permissionButton.text = "Allow usage access"
-        permissionButton.setOnClickListener {
+        usageButton = Button(this)
+        usageButton.text = "1. Allow usage access"
+        usageButton.setOnClickListener {
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+        }
+
+        overlayButton = Button(this)
+        overlayButton.text = "2. Allow display over other apps"
+        overlayButton.setOnClickListener {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
         }
 
         limitInput = EditText(this)
@@ -54,10 +73,27 @@ class MainActivity : Activity() {
             refresh()
         }
 
+        startButton = Button(this)
+        startButton.text = "Start blocker"
+        startButton.setOnClickListener {
+            startForegroundService(Intent(this, BlockerService::class.java))
+            Toast.makeText(this, "Blocker started", Toast.LENGTH_SHORT).show()
+        }
+
+        stopButton = Button(this)
+        stopButton.text = "Stop blocker"
+        stopButton.setOnClickListener {
+            stopService(Intent(this, BlockerService::class.java))
+            Toast.makeText(this, "Blocker stopped", Toast.LENGTH_SHORT).show()
+        }
+
         layout.addView(infoText)
-        layout.addView(permissionButton)
+        layout.addView(usageButton)
+        layout.addView(overlayButton)
         layout.addView(limitInput)
         layout.addView(saveButton)
+        layout.addView(startButton)
+        layout.addView(stopButton)
         setContentView(layout)
     }
 
@@ -69,9 +105,17 @@ class MainActivity : Activity() {
     private fun getPrefs() = getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     private fun refresh() {
-        if (hasUsagePermission()) {
-            permissionButton.visibility = View.GONE
-            val used = (getTodayScreenTimeMs() / 60000).toInt()
+        val hasUsage = hasUsagePermission()
+        val hasOverlay = Settings.canDrawOverlays(this)
+
+        usageButton.visibility = if (hasUsage) View.GONE else View.VISIBLE
+        overlayButton.visibility = if (hasOverlay) View.GONE else View.VISIBLE
+        val ready = hasUsage && hasOverlay
+        startButton.visibility = if (ready) View.VISIBLE else View.GONE
+        stopButton.visibility = if (ready) View.VISIBLE else View.GONE
+
+        if (hasUsage) {
+            val used = (UsageHelper.todayScreenTimeMs(this) / 60000).toInt()
             val limit = getPrefs().getInt("limit_minutes", 0)
             var text = "Used today: ${used / 60}h ${used % 60}m"
             if (limit > 0) {
@@ -87,8 +131,7 @@ class MainActivity : Activity() {
             }
             infoText.text = text
         } else {
-            permissionButton.visibility = View.VISIBLE
-            infoText.text = "Please allow usage access so the app can measure your screen time."
+            infoText.text = "Please allow the permissions below so the app can work."
         }
     }
 
@@ -101,37 +144,5 @@ class MainActivity : Activity() {
         )
         return mode == AppOpsManager.MODE_ALLOWED
     }
-
-    private fun getTodayScreenTimeMs(): Long {
-        val manager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        val start = calendar.timeInMillis
-        val now = System.currentTimeMillis()
-
-        val events = manager.queryEvents(start, now)
-        val event = UsageEvents.Event()
-        val openApps = HashMap<String, Long>()
-        var total = 0L
-
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            val pkg = event.packageName
-            when (event.eventType) {
-                UsageEvents.Event.MOVE_TO_FOREGROUND -> openApps[pkg] = event.timeStamp
-                UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                    val opened = openApps.remove(pkg)
-                    if (opened != null) total += event.timeStamp - opened
-                }
-            }
-        }
-        for (opened in openApps.values) total += now - opened
-        return total
-    }
 }
-
     
