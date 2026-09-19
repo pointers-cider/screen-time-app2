@@ -37,6 +37,10 @@
             android:name=".AllowedAppsActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".AppUsageActivity"
+            android:exported="false" />
+
         <service
             android:name=".BlockerService"
             android:exported="false"
