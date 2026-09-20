@@ -187,7 +187,7 @@ class MainActivity : Activity() {
         // Limit card
         val limitCard = cardLayout()
         limitCard.addView(label("Daily limit", 16f, textMain, true))
-        addTo(limitCard, label("Minutes allowed per day", 13f, textDim), 2)
+        addTo(limitCard, label("Minutes allowed per day (default for all days)", 13f, textDim), 2)
 
         limitInput = EditText(this)
         limitInput.hint = "e.g. 120"
@@ -260,6 +260,13 @@ class MainActivity : Activity() {
         }
         addTo(root, chooseButton, 10)
 
+        // Customize
+        val customizeButton = styledButton("Customize", card, textMain)
+        customizeButton.setOnClickListener {
+            startActivity(Intent(this, CustomizeActivity::class.java))
+        }
+        addTo(root, customizeButton, 10)
+
         // Start / stop blocker
         controlsRow = LinearLayout(this)
         controlsRow.orientation = LinearLayout.HORIZONTAL
@@ -325,11 +332,11 @@ class MainActivity : Activity() {
         }
 
         val used = (UsageHelper.todayScreenTimeMs(this) / 60000).toInt()
-        val limit = getPrefs().getInt("limit_minutes", 0)
+        val limit = UsageHelper.todayLimitMinutes(this)
         usedText.text = "${used / 60}h ${used % 60}m"
 
         if (limit <= 0) {
-            statusText.text = "No limit set yet"
+            statusText.text = "No limit set for today"
             statusText.setTextColor(textDim)
             setBar(0, accent)
             return
