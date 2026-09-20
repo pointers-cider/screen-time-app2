@@ -43,6 +43,22 @@
             android:name=".AppUsageActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".CustomizeActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".LockScreenSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".LimitsByDayActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".CountedAppsActivity"
+            android:exported="false" />
+
         <service
             android:name=".BlockerService"
             android:exported="false"
