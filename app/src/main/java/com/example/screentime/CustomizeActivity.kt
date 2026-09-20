@@ -84,6 +84,13 @@ class CustomizeActivity : Activity() {
             LockScreenSettingsActivity::class.java
         )
 
+        addItem(
+            root,
+            "Limits by day",
+            "Set a different screen time limit for each day of the week",
+            LimitsByDayActivity::class.java
+        )
+
         val scroll = ScrollView(this)
         scroll.setBackgroundColor(bg)
         scroll.isFillViewport = true
