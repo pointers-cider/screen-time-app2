@@ -43,6 +43,23 @@ object UsageHelper {
     }
 
     fun todayScreenTimeMs(context: Context): Long {
-        return todayPerAppMs(context).values.sum()
+        val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val perApp = todayPerAppMs(context)
+        if (!prefs.getBoolean("count_only_selected", false)) {
+            return perApp.values.sum()
+        }
+        val counted = prefs.getStringSet("counted_apps", emptySet()) ?: emptySet()
+        var total = 0L
+        for ((pkg, ms) in perApp) {
+            if (counted.contains(pkg)) total += ms
+        }
+        return total
+    }
+
+    fun todayLimitMinutes(context: Context): Int {
+        val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val day = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+        val perDay = prefs.getInt("limit_day_$day", -1)
+        return if (perDay >= 0) perDay else prefs.getInt("limit_minutes", 0)
     }
 }
