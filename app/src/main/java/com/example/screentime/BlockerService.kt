@@ -88,6 +88,13 @@ class BlockerService : Service() {
         return "%02d:%02d".format(minutes / 60, minutes % 60)
     }
 
+    private fun textColorFor(background: Int): Int {
+        val brightness = 0.299 * Color.red(background) +
+            0.587 * Color.green(background) +
+            0.114 * Color.blue(background)
+        return if (brightness > 150) Color.parseColor("#111111") else Color.WHITE
+    }
+
     private fun inBlockedWindow(prefs: SharedPreferences): Boolean {
         if (!prefs.getBoolean("window_enabled", false)) return false
         val start = prefs.getInt("window_start", 8 * 60)
@@ -106,7 +113,7 @@ class BlockerService : Service() {
         updateForegroundApp()
 
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val limit = prefs.getInt("limit_minutes", 0)
+        val limit = UsageHelper.todayLimitMinutes(this)
         val windowBlocked = inBlockedWindow(prefs)
 
         var limitReached = false
@@ -177,9 +184,18 @@ class BlockerService : Service() {
         return set
     }
 
-    private fun showOverlay(message: String) {
+    private fun showOverlay(defaultMessage: String) {
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val custom = (prefs.getString("lock_message", "") ?: "").trim()
+        val message = if (custom.isEmpty()) defaultMessage else custom
+        val backgroundColor = prefs.getInt("lock_color", Color.parseColor("#121212"))
+        val textSize = prefs.getInt("lock_text_size", 22)
+
         if (overlay != null) {
+            overlay?.setBackgroundColor(backgroundColor)
             overlayText?.text = message
+            overlayText?.setTextColor(textColorFor(backgroundColor))
+            overlayText?.textSize = textSize.toFloat()
             return
         }
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -187,13 +203,13 @@ class BlockerService : Service() {
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
         layout.gravity = Gravity.CENTER
-        layout.setBackgroundColor(Color.parseColor("#121212"))
+        layout.setBackgroundColor(backgroundColor)
         layout.setPadding(64, 64, 64, 64)
 
         val text = TextView(this)
         text.text = message
-        text.setTextColor(Color.WHITE)
-        text.textSize = 22f
+        text.setTextColor(textColorFor(backgroundColor))
+        text.textSize = textSize.toFloat()
         text.gravity = Gravity.CENTER
         layout.addView(text)
 
