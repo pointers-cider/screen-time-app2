@@ -8,6 +8,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Color
@@ -23,6 +24,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.util.Calendar
 
 class BlockerService : Service() {
 
@@ -32,6 +34,7 @@ class BlockerService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var overlay: View? = null
+    private var overlayText: TextView? = null
     private var currentPkg: String? = null
     private var lastEventTime = 0L
     private var usedMinutes = 0
@@ -62,7 +65,7 @@ class BlockerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Screen Time is active")
-            .setContentText("Watching your daily limit")
+            .setContentText("Watching your limit and blocked hours")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
         if (Build.VERSION.SDK_INT >= 34) {
@@ -81,25 +84,53 @@ class BlockerService : Service() {
         super.onDestroy()
     }
 
+    private fun formatClock(minutes: Int): String {
+        return "%02d:%02d".format(minutes / 60, minutes % 60)
+    }
+
+    private fun inBlockedWindow(prefs: SharedPreferences): Boolean {
+        if (!prefs.getBoolean("window_enabled", false)) return false
+        val start = prefs.getInt("window_start", 8 * 60)
+        val end = prefs.getInt("window_end", 15 * 60)
+        if (start == end) return false
+        val calendar = Calendar.getInstance()
+        val now = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        return if (start < end) {
+            now >= start && now < end
+        } else {
+            now >= start || now < end
+        }
+    }
+
     private fun checkAndBlock() {
         updateForegroundApp()
 
-        val limit = getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getInt("limit_minutes", 0)
-        if (limit <= 0) {
-            hideOverlay()
-            return
-        }
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val limit = prefs.getInt("limit_minutes", 0)
+        val windowBlocked = inBlockedWindow(prefs)
 
-        val now = System.currentTimeMillis()
-        if (now - lastUsageCheck > 15000) {
-            usedMinutes = (UsageHelper.todayScreenTimeMs(this) / 60000).toInt()
-            lastUsageCheck = now
+        var limitReached = false
+        if (limit > 0) {
+            val now = System.currentTimeMillis()
+            if (now - lastUsageCheck > 15000) {
+                usedMinutes = (UsageHelper.todayScreenTimeMs(this) / 60000).toInt()
+                lastUsageCheck = now
+            }
+            limitReached = usedMinutes >= limit
         }
 
         val pkg = currentPkg
-        if (usedMinutes >= limit && pkg != null && !allowedPackages().contains(pkg)) {
-            showOverlay()
+        val shouldBlock = (windowBlocked || limitReached) &&
+            pkg != null && !allowedPackages().contains(pkg)
+
+        if (shouldBlock) {
+            val message = if (windowBlocked) {
+                val end = prefs.getInt("window_end", 15 * 60)
+                "Blocked hours are active until ${formatClock(end)}.\n\nCalls and texts still work. Go to your home screen to use them."
+            } else {
+                "Daily screen time limit reached.\n\nCalls and texts still work. Go to your home screen to use them."
+            }
+            showOverlay(message)
         } else {
             hideOverlay()
         }
@@ -146,8 +177,11 @@ class BlockerService : Service() {
         return set
     }
 
-    private fun showOverlay() {
-        if (overlay != null) return
+    private fun showOverlay(message: String) {
+        if (overlay != null) {
+            overlayText?.text = message
+            return
+        }
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         val layout = LinearLayout(this)
@@ -157,7 +191,7 @@ class BlockerService : Service() {
         layout.setPadding(64, 64, 64, 64)
 
         val text = TextView(this)
-        text.text = "Daily screen time limit reached.\n\nCalls and texts still work. Go to your home screen to use them."
+        text.text = message
         text.setTextColor(Color.WHITE)
         text.textSize = 22f
         text.gravity = Gravity.CENTER
@@ -173,6 +207,7 @@ class BlockerService : Service() {
         )
         wm.addView(layout, params)
         overlay = layout
+        overlayText = text
     }
 
     private fun hideOverlay() {
@@ -180,5 +215,6 @@ class BlockerService : Service() {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         wm.removeView(view)
         overlay = null
+        overlayText = null
     }
 }
