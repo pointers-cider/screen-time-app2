@@ -3,6 +3,7 @@ package com.example.screentime
 import android.Manifest
 import android.app.Activity
 import android.app.AppOpsManager
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -20,6 +21,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 
@@ -41,6 +43,9 @@ class MainActivity : Activity() {
     private lateinit var usageButton: Button
     private lateinit var overlayButton: Button
     private lateinit var limitInput: EditText
+    private lateinit var windowSwitch: Switch
+    private lateinit var startTimeButton: Button
+    private lateinit var endTimeButton: Button
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
     private lateinit var controlsRow: LinearLayout
@@ -90,6 +95,32 @@ class MainActivity : Activity() {
         )
         params.topMargin = dp(topDp)
         parent.addView(child, params)
+    }
+
+    private fun formatClock(minutes: Int): String {
+        return "%02d:%02d".format(minutes / 60, minutes % 60)
+    }
+
+    private fun updateTimeButtons() {
+        val start = getPrefs().getInt("window_start", 8 * 60)
+        val end = getPrefs().getInt("window_end", 15 * 60)
+        startTimeButton.text = "From  " + formatClock(start)
+        endTimeButton.text = "Until  " + formatClock(end)
+    }
+
+    private fun pickTime(key: String, defaultMinutes: Int) {
+        val current = getPrefs().getInt(key, defaultMinutes)
+        val dialog = TimePickerDialog(
+            this,
+            { _, hour, minute ->
+                getPrefs().edit().putInt(key, hour * 60 + minute).apply()
+                updateTimeButtons()
+            },
+            current / 60,
+            current % 60,
+            true
+        )
+        dialog.show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -179,6 +210,41 @@ class MainActivity : Activity() {
         }
         addTo(limitCard, saveButton, 12)
         addTo(root, limitCard, 16)
+
+        // Blocked hours card
+        val windowCard = cardLayout()
+        windowCard.addView(label("Blocked hours", 16f, textMain, true))
+        addTo(
+            windowCard,
+            label("Lock apps every day between these times. Calls and texts stay on.", 13f, textDim),
+            2
+        )
+
+        windowSwitch = Switch(this)
+        windowSwitch.text = "Enable blocked hours"
+        windowSwitch.setTextColor(textMain)
+        windowSwitch.textSize = 16f
+        windowSwitch.isChecked = getPrefs().getBoolean("window_enabled", false)
+        windowSwitch.setOnCheckedChangeListener { _, checked ->
+            getPrefs().edit().putBoolean("window_enabled", checked).apply()
+        }
+        addTo(windowCard, windowSwitch, 12)
+
+        startTimeButton = styledButton("", Color.parseColor("#252A34"), textMain)
+        startTimeButton.setOnClickListener { pickTime("window_start", 8 * 60) }
+        endTimeButton = styledButton("", Color.parseColor("#252A34"), textMain)
+        endTimeButton.setOnClickListener { pickTime("window_end", 15 * 60) }
+
+        val timesRow = LinearLayout(this)
+        timesRow.orientation = LinearLayout.HORIZONTAL
+        val timeLeft = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        val timeRight = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        timeRight.leftMargin = dp(10)
+        timesRow.addView(startTimeButton, timeLeft)
+        timesRow.addView(endTimeButton, timeRight)
+        addTo(windowCard, timesRow, 12)
+        updateTimeButtons()
+        addTo(root, windowCard, 16)
 
         // App usage today
         val appUsageButton = styledButton("App usage today", card, textMain)
